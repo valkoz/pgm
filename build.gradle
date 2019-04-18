@@ -1,0 +1,17 @@
+plugins {
+    id 'java'
+}
+
+group 'ru.mephi.valkoz'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // https://mvnrepository.com/artifact/com.cra.figaro/figaro
+    compile group: 'com.cra.figaro', name: 'figaro_2.11', version: '5.0.0.0'
+}
