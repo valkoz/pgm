@@ -1,3 +1,5 @@
+import Burglary.{burglary, earthquake, johnCalls}
+import com.cra.figaro.algorithm.factored.VariableElimination
 import com.cra.figaro.language.{Flip, Select, Universe}
 import com.cra.figaro.library.compound.CPD
 
@@ -94,6 +96,38 @@ object Loan {
     (Reliability.Unreliable, FutureIncome.NotPromising, RodToIncome.High) -> Select(0.05 -> CreditWorthiness.Positive, 0.95 -> CreditWorthiness.Negative),
 
   )
+
+  def main(args: Array[String]) {
+    reliability.observe(Reliability.Reliable)
+    paymentHistory.observe(PaymentHistory.Excellent)
+    val alg = VariableElimination(creditWorthiness)
+    alg.start()
+    println("Probability 1: " + alg.probability(creditWorthiness, CreditWorthiness.Positive))
+    alg.kill
+
+    reliability.observe(Reliability.Reliable)
+    paymentHistory.observe(PaymentHistory.Acceptable)
+    val alg2 = VariableElimination(creditWorthiness)
+    alg2.start()
+    println("Probability 2: " + alg2.probability(creditWorthiness, CreditWorthiness.Positive))
+    alg2.kill
+
+    reliability.observe(Reliability.Reliable)
+    paymentHistory.observe(PaymentHistory.Unacceptable)
+    val alg3 = VariableElimination(creditWorthiness)
+    alg3.start()
+    println("Probability 3: " + alg3.probability(creditWorthiness, CreditWorthiness.Positive))
+    alg3.kill
+
+    reliability.unobserve()
+    futureIncome.observe(FutureIncome.NotPromising)
+    paymentHistory.observe(PaymentHistory.Unacceptable)
+    rodToIncome.observe(RodToIncome.High)
+    val alg4 = VariableElimination(creditWorthiness)
+    alg4.start()
+    println("Probability 4: " + alg4.probability(creditWorthiness, CreditWorthiness.Positive))
+    alg4.kill
+  }
 
 
 }
