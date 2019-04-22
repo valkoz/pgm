@@ -35,6 +35,18 @@ object CreditWorthiness extends Enumeration {
   val Positive, Negative = Value
 }
 
+object Education extends Enumeration {
+  val NoEducation, HighSchool, University = Value
+}
+
+object MaritalStatus extends Enumeration {
+  val Married, Alone = Value
+}
+
+object CriminalHistory extends Enumeration {
+  val Criminal, NonCriminal = Value
+}
+
 
 object Loan {
   Universe.createNew()
@@ -45,10 +57,37 @@ object Loan {
 
   private val rodToIncome = Select(0.3 -> RodToIncome.Low, 0.7 -> RodToIncome.High)
 
-  private val assets = CPD(income,
-    Income.High -> Select(0.6 -> Assets.High, 0.3 -> Assets.Medium, 0.1 -> Assets.Low),
-    Income.Medium  -> Select(0.3 -> Assets.High, 0.4 -> Assets.Medium, 0.3 -> Assets.Low),
-    Income.Low  -> Select(0.1 -> Assets.High, 0.4 -> Assets.Medium, 0.5 -> Assets.Low)
+  private val education = CPD(age,
+    Age.Young-> Select(0.1 -> Education.NoEducation, 0.89 -> Education.HighSchool, 0.01 -> Education.University),
+    Age.MiddleAged-> Select(0.1 -> Education.NoEducation, 0.6 -> Education.HighSchool, 0.3 -> Education.University),
+    Age.Old-> Select(0.1 -> Education.NoEducation, 0.5 -> Education.HighSchool, 0.4 -> Education.University)
+  )
+
+  private val maritalStatus = CPD(age,
+    Age.Young-> Select(0.2 -> MaritalStatus.Married, 0.8 -> MaritalStatus.Alone),
+    Age.MiddleAged-> Select(0.5 -> MaritalStatus.Married, 0.5 -> MaritalStatus.Alone),
+    Age.Old-> Select(0.8 -> MaritalStatus.Married, 0.2 -> MaritalStatus.Alone)
+  )
+
+  private val criminalHistory = CPD(age, income,
+    (Age.Young, Income.High) -> Select(0.95 -> CriminalHistory.NonCriminal, 0.05 -> CriminalHistory.Criminal),
+    (Age.Young, Income.Medium) -> Select(0.97 -> CriminalHistory.NonCriminal, 0.03 -> CriminalHistory.Criminal),
+    (Age.Young, Income.Low) -> Select(0.85 -> CriminalHistory.NonCriminal, 0.15 -> CriminalHistory.Criminal),
+    (Age.MiddleAged, Income.High) -> Select(0.93 -> CriminalHistory.NonCriminal, 0.07 -> CriminalHistory.Criminal),
+    (Age.MiddleAged, Income.Medium) -> Select(0.9 -> CriminalHistory.NonCriminal, 0.1 -> CriminalHistory.Criminal),
+    (Age.MiddleAged, Income.Low) -> Select(0.8 -> CriminalHistory.NonCriminal, 0.2 -> CriminalHistory.Criminal),
+    (Age.Old, Income.High) -> Select(0.9 -> CriminalHistory.NonCriminal, 0.1 -> CriminalHistory.Criminal),
+    (Age.Old, Income.Medium) -> Select(0.85 -> CriminalHistory.NonCriminal, 0.15 -> CriminalHistory.Criminal),
+    (Age.Old, Income.Low) -> Select(0.7 -> CriminalHistory.NonCriminal, 0.3 -> CriminalHistory.Criminal)
+  )
+
+  private val assets = CPD(income, maritalStatus,
+    (Income.High, MaritalStatus.Married) -> Select(0.7 -> Assets.High, 0.2 -> Assets.Medium, 0.1 -> Assets.Low),
+    (Income.Medium, MaritalStatus.Married) -> Select(0.4 -> Assets.High, 0.4 -> Assets.Medium, 0.2 -> Assets.Low),
+    (Income.Low, MaritalStatus.Married) -> Select(0.2 -> Assets.High, 0.4 -> Assets.Medium, 0.4 -> Assets.Low),
+    (Income.High, MaritalStatus.Alone) -> Select(0.6 -> Assets.High, 0.3 -> Assets.Medium, 0.1 -> Assets.Low),
+    (Income.Medium, MaritalStatus.Alone) -> Select(0.3 -> Assets.High, 0.4 -> Assets.Medium, 0.3 -> Assets.Low),
+    (Income.Low, MaritalStatus.Alone) -> Select(0.1 -> Assets.High, 0.4 -> Assets.Medium, 0.5 -> Assets.Low)
   )
 
   private val paymentHistory = CPD(age, rodToIncome,
@@ -73,60 +112,114 @@ object Loan {
     (Assets.Low, Income.Low) -> Select(0.1 -> FutureIncome.Promising, 0.9 -> FutureIncome.NotPromising)
   )
 
-  private val reliability = CPD(paymentHistory, age,
-    (PaymentHistory.Excellent, Age.Young) -> Select(0.75 -> Reliability.Reliable, 0.25 -> Reliability.Unreliable),
-    (PaymentHistory.Excellent, Age.MiddleAged) -> Select(0.85 -> Reliability.Reliable, 0.15 -> Reliability.Unreliable),
-    (PaymentHistory.Excellent, Age.Old) -> Select(0.9 -> Reliability.Reliable, 0.1 -> Reliability.Unreliable),
-    (PaymentHistory.Acceptable, Age.Young) -> Select(0.4 -> Reliability.Reliable, 0.6 -> Reliability.Unreliable),
-    (PaymentHistory.Acceptable, Age.MiddleAged) -> Select(0.5 -> Reliability.Reliable, 0.5 -> Reliability.Unreliable),
-    (PaymentHistory.Acceptable, Age.Old) -> Select(0.6 -> Reliability.Reliable, 0.4 -> Reliability.Unreliable),
-    (PaymentHistory.Unacceptable, Age.Young) -> Select(0.01 -> Reliability.Reliable, 0.99 -> Reliability.Unreliable),
-    (PaymentHistory.Unacceptable, Age.MiddleAged) -> Select(0.1 -> Reliability.Reliable, 0.9 -> Reliability.Unreliable),
-    (PaymentHistory.Unacceptable, Age.Old) -> Select(0.1 -> Reliability.Reliable, 0.9 -> Reliability.Unreliable)
+  private val reliability = CPD(paymentHistory, age, education,
+    (PaymentHistory.Excellent, Age.Young, Education.University) -> Select(0.75 -> Reliability.Reliable, 0.25 -> Reliability.Unreliable),
+    (PaymentHistory.Excellent, Age.MiddleAged, Education.University) -> Select(0.85 -> Reliability.Reliable, 0.15 -> Reliability.Unreliable),
+    (PaymentHistory.Excellent, Age.Old, Education.University) -> Select(0.9 -> Reliability.Reliable, 0.1 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.Young, Education.University) -> Select(0.4 -> Reliability.Reliable, 0.6 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.MiddleAged, Education.University) -> Select(0.5 -> Reliability.Reliable, 0.5 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.Old, Education.University) -> Select(0.6 -> Reliability.Reliable, 0.4 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.Young, Education.University) -> Select(0.01 -> Reliability.Reliable, 0.99 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.MiddleAged, Education.University) -> Select(0.1 -> Reliability.Reliable, 0.9 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.Old, Education.University) -> Select(0.1 -> Reliability.Reliable, 0.9 -> Reliability.Unreliable),
+
+    (PaymentHistory.Excellent, Age.Young, Education.HighSchool) -> Select(0.7 -> Reliability.Reliable, 0.3 -> Reliability.Unreliable),
+    (PaymentHistory.Excellent, Age.MiddleAged, Education.HighSchool) -> Select(0.8 -> Reliability.Reliable, 0.2 -> Reliability.Unreliable),
+    (PaymentHistory.Excellent, Age.Old, Education.HighSchool) -> Select(0.85 -> Reliability.Reliable, 0.15 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.Young, Education.HighSchool) -> Select(0.35 -> Reliability.Reliable, 0.65 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.MiddleAged, Education.HighSchool) -> Select(0.35 -> Reliability.Reliable, 0.55 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.Old, Education.HighSchool) -> Select(0.55 -> Reliability.Reliable, 0.45 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.Young, Education.HighSchool) -> Select(0.01 -> Reliability.Reliable, 0.99 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.MiddleAged, Education.HighSchool) -> Select(0.1 -> Reliability.Reliable, 0.9 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.Old, Education.HighSchool) -> Select(0.1 -> Reliability.Reliable, 0.9 -> Reliability.Unreliable),
+
+    (PaymentHistory.Excellent, Age.Young, Education.NoEducation) -> Select(0.65 -> Reliability.Reliable, 0.35 -> Reliability.Unreliable),
+    (PaymentHistory.Excellent, Age.MiddleAged, Education.NoEducation) -> Select(0.75 -> Reliability.Reliable, 0.25 -> Reliability.Unreliable),
+    (PaymentHistory.Excellent, Age.Old, Education.NoEducation) -> Select(0.8 -> Reliability.Reliable, 0.2 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.Young, Education.NoEducation) -> Select(0.3 -> Reliability.Reliable, 0.7 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.MiddleAged, Education.NoEducation) -> Select(0.4 -> Reliability.Reliable, 0.6 -> Reliability.Unreliable),
+    (PaymentHistory.Acceptable, Age.Old, Education.NoEducation) -> Select(0.5 -> Reliability.Reliable, 0.5 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.Young, Education.NoEducation) -> Select(0.01 -> Reliability.Reliable, 0.99 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.MiddleAged, Education.NoEducation) -> Select(0.01 -> Reliability.Reliable, 0.99 -> Reliability.Unreliable),
+    (PaymentHistory.Unacceptable, Age.Old, Education.NoEducation) -> Select(0.01 -> Reliability.Reliable, 0.99 -> Reliability.Unreliable)
   )
 
-  private val creditWorthiness = CPD(reliability, futureIncome, rodToIncome,
-    (Reliability.Reliable, FutureIncome.Promising,RodToIncome.Low) -> Select(0.95 -> CreditWorthiness.Positive, 0.05 -> CreditWorthiness.Negative),
-    (Reliability.Reliable, FutureIncome.Promising, RodToIncome.High) -> Select(0.9 -> CreditWorthiness.Positive, 0.1 -> CreditWorthiness.Negative),
-    (Reliability.Reliable, FutureIncome.NotPromising,RodToIncome.Low) -> Select(0.55 -> CreditWorthiness.Positive, 0.45 -> CreditWorthiness.Negative),
-    (Reliability.Reliable, FutureIncome.NotPromising, RodToIncome.High) -> Select(0.3 -> CreditWorthiness.Positive, 0.7 -> CreditWorthiness.Negative),
-    (Reliability.Unreliable, FutureIncome.Promising,RodToIncome.Low) -> Select(0.5 -> CreditWorthiness.Positive, 0.5 -> CreditWorthiness.Negative),
-    (Reliability.Unreliable, FutureIncome.Promising, RodToIncome.High) -> Select(0.2 -> CreditWorthiness.Positive, 0.8 -> CreditWorthiness.Negative),
-    (Reliability.Unreliable, FutureIncome.NotPromising,RodToIncome.Low) -> Select(0.1 -> CreditWorthiness.Positive, 0.9 -> CreditWorthiness.Negative),
-    (Reliability.Unreliable, FutureIncome.NotPromising, RodToIncome.High) -> Select(0.05 -> CreditWorthiness.Positive, 0.95 -> CreditWorthiness.Negative),
+  private val creditWorthiness = CPD(reliability, futureIncome, rodToIncome, criminalHistory,
+    (Reliability.Reliable, FutureIncome.Promising, RodToIncome.Low, CriminalHistory.NonCriminal) -> Select(0.95 -> CreditWorthiness.Positive, 0.05 -> CreditWorthiness.Negative),
+    (Reliability.Reliable, FutureIncome.Promising, RodToIncome.High, CriminalHistory.NonCriminal) -> Select(0.9 -> CreditWorthiness.Positive, 0.1 -> CreditWorthiness.Negative),
+    (Reliability.Reliable, FutureIncome.NotPromising, RodToIncome.Low, CriminalHistory.NonCriminal) -> Select(0.55 -> CreditWorthiness.Positive, 0.45 -> CreditWorthiness.Negative),
+    (Reliability.Reliable, FutureIncome.NotPromising, RodToIncome.High, CriminalHistory.NonCriminal) -> Select(0.3 -> CreditWorthiness.Positive, 0.7 -> CreditWorthiness.Negative),
+    (Reliability.Unreliable, FutureIncome.Promising, RodToIncome.Low, CriminalHistory.NonCriminal) -> Select(0.5 -> CreditWorthiness.Positive, 0.5 -> CreditWorthiness.Negative),
+    (Reliability.Unreliable, FutureIncome.Promising, RodToIncome.High, CriminalHistory.NonCriminal) -> Select(0.2 -> CreditWorthiness.Positive, 0.8 -> CreditWorthiness.Negative),
+    (Reliability.Unreliable, FutureIncome.NotPromising, RodToIncome.Low, CriminalHistory.NonCriminal) -> Select(0.1 -> CreditWorthiness.Positive, 0.9 -> CreditWorthiness.Negative),
+    (Reliability.Unreliable, FutureIncome.NotPromising, RodToIncome.High, CriminalHistory.NonCriminal) -> Select(0.05 -> CreditWorthiness.Positive, 0.95 -> CreditWorthiness.Negative),
+
+    (Reliability.Reliable, FutureIncome.Promising, RodToIncome.Low, CriminalHistory.Criminal) -> Select(0.4 -> CreditWorthiness.Positive, 0.6 -> CreditWorthiness.Negative),
+    (Reliability.Reliable, FutureIncome.Promising, RodToIncome.High, CriminalHistory.Criminal) -> Select(0.3 -> CreditWorthiness.Positive, 0.7 -> CreditWorthiness.Negative),
+    (Reliability.Reliable, FutureIncome.NotPromising, RodToIncome.Low, CriminalHistory.Criminal) -> Select(0.15 -> CreditWorthiness.Positive, 0.85 -> CreditWorthiness.Negative),
+    (Reliability.Reliable, FutureIncome.NotPromising, RodToIncome.High, CriminalHistory.Criminal) -> Select(0.1 -> CreditWorthiness.Positive, 0.9 -> CreditWorthiness.Negative),
+    (Reliability.Unreliable, FutureIncome.Promising, RodToIncome.Low, CriminalHistory.Criminal) -> Select(0.005 -> CreditWorthiness.Positive, 0.095 -> CreditWorthiness.Negative),
+    (Reliability.Unreliable, FutureIncome.Promising, RodToIncome.High, CriminalHistory.Criminal) -> Select(0.002 -> CreditWorthiness.Positive, 0.098 -> CreditWorthiness.Negative),
+    (Reliability.Unreliable, FutureIncome.NotPromising, RodToIncome.Low, CriminalHistory.Criminal) -> Select(0.001 -> CreditWorthiness.Positive, 0.999 -> CreditWorthiness.Negative),
+    (Reliability.Unreliable, FutureIncome.NotPromising, RodToIncome.High, CriminalHistory.Criminal) -> Select(0.001 -> CreditWorthiness.Positive, 0.999 -> CreditWorthiness.Negative)
 
   )
 
   def main(args: Array[String]) {
+
     reliability.observe(Reliability.Reliable)
     paymentHistory.observe(PaymentHistory.Excellent)
     val alg = VariableElimination(creditWorthiness)
     alg.start()
-    println("Probability 1: " + alg.probability(creditWorthiness, CreditWorthiness.Positive))
+    println("Reliable client with Excellent History: " + alg.probability(creditWorthiness, CreditWorthiness.Positive))
     alg.kill
+    unobserve()
 
     reliability.observe(Reliability.Reliable)
     paymentHistory.observe(PaymentHistory.Acceptable)
     val alg2 = VariableElimination(creditWorthiness)
     alg2.start()
-    println("Probability 2: " + alg2.probability(creditWorthiness, CreditWorthiness.Positive))
+    println("Reliable client with Acceptable History: " + alg2.probability(creditWorthiness, CreditWorthiness.Positive))
     alg2.kill
+    unobserve()
 
     reliability.observe(Reliability.Reliable)
     paymentHistory.observe(PaymentHistory.Unacceptable)
     val alg3 = VariableElimination(creditWorthiness)
     alg3.start()
-    println("Probability 3: " + alg3.probability(creditWorthiness, CreditWorthiness.Positive))
+    println("Reliable client with Unacceptable History: " + alg3.probability(creditWorthiness, CreditWorthiness.Positive))
     alg3.kill
+    unobserve()
 
-    reliability.unobserve()
     futureIncome.observe(FutureIncome.NotPromising)
     paymentHistory.observe(PaymentHistory.Unacceptable)
     rodToIncome.observe(RodToIncome.High)
     val alg4 = VariableElimination(creditWorthiness)
     alg4.start()
-    println("Probability 4: " + alg4.probability(creditWorthiness, CreditWorthiness.Positive))
+    println("High Ratio of Debts, Not Promising Future income and Unacceptable Payment History: " + alg4.probability(creditWorthiness, CreditWorthiness.Positive))
     alg4.kill
+    unobserve()
+
+    criminalHistory.observe(CriminalHistory.Criminal)
+    paymentHistory.observe(PaymentHistory.Unacceptable)
+    val alg5 = VariableElimination(creditWorthiness)
+    alg5.start()
+    println("Criminal with Unacceptable payment history: " + alg5.probability(creditWorthiness, CreditWorthiness.Positive))
+    alg5.kill
+  }
+
+  def unobserve(): Unit = {
+    income.unobserve()
+    age.unobserve()
+    rodToIncome.unobserve()
+    education.unobserve()
+    maritalStatus.unobserve()
+    criminalHistory.unobserve()
+    assets.unobserve()
+    reliability.unobserve()
+    futureIncome.unobserve()
+    paymentHistory.unobserve()
+    creditWorthiness.unobserve()
   }
 
 
